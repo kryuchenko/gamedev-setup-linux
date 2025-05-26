@@ -203,20 +203,22 @@ info "winetricks installed"
 # Lutris репозиторий
 substep "Configuring Lutris repository..."
 safe_exec mkdir -p /etc/apt/keyrings
-if curl -fsSL https://keys.openpgp.org/vks/v1/by-fingerprint/A8A515F046D7E7CF9057442FABFF2E41FE3E1B5D \
+
+# Пробуем разные способы получения ключа
+if curl -fsSL https://download.opensuse.org/repositories/home:/strycore/Debian_12/Release.key \
+    | gpg --dearmor -o /etc/apt/keyrings/lutris.gpg 2>/dev/null; then
+    KEYOPT="signed-by=/etc/apt/keyrings/lutris.gpg"
+elif curl -fsSL https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x82D96E430A1F1C0F409FA5F5D1C83CA9A8A515F0 \
     | gpg --dearmor -o /etc/apt/keyrings/lutris.gpg 2>/dev/null; then
     KEYOPT="signed-by=/etc/apt/keyrings/lutris.gpg"
 else
+    warn "Could not fetch Lutris GPG key, using trusted=yes"
     KEYOPT="trusted=yes"
 fi
 
-if [[ "$DIST_CODENAME" == "noble" ]] || [[ "$DIST_CODENAME" == "mantic" ]]; then
-    echo "deb [$KEYOPT] https://download.opensuse.org/repositories/home:/strycore/Debian_12/ /" \
-        > /etc/apt/sources.list.d/lutris.list
-else
-    echo "deb [$KEYOPT] https://ppa.launchpadcontent.net/lutris-team/lutris/ubuntu $DIST_CODENAME main" \
-        > /etc/apt/sources.list.d/lutris.list
-fi
+# Используем OpenSUSE репозиторий для всех дистрибутивов (более надёжный)
+echo "deb [$KEYOPT] https://download.opensuse.org/repositories/home:/strycore/Debian_12/ /" \
+    > /etc/apt/sources.list.d/lutris.list
 
 # Lutris & Steam
 substep "Installing Lutris & Steam..."
