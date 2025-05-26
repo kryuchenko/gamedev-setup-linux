@@ -134,7 +134,8 @@ safe_exec apt-get update -qq
 safe_exec apt-get install -y --no-install-recommends \
     curl wget ca-certificates lsb-release software-properties-common \
     tar zstd jq xz-utils p7zip-full unzip gnupg \
-    desktop-file-utils xdg-utils pciutils
+    desktop-file-utils xdg-utils pciutils \
+    python3-pip python3-setuptools
 info "Core utilities installed"
 
 # Низколатентный аудио-стек
@@ -568,38 +569,66 @@ fi
 # Ravenfield Game
 substep "Downloading Ravenfield game..."
 mkdir -p ~/Desktop/Games
-echo "Downloading Ravenfield from itch.io..."
-echo "Note: This will download the free beta version"
-# Прямая ссылка на бесплатную бета-версию Ravenfield
-RAVENFIELD_URL="https://steelraven7.itch.io/ravenfield/download/eyJleHBpcmVzIjoxNzA0MDk2MDAwLCJpZCI6MjU5NzB9.0oAQvM5%2fpOdPrMKKH%2fgNqVJRkf0%3d"
-if curl -fsSL -L -o ~/Desktop/Games/ravenfield-beta.zip \
-    "https://steelraven7.itch.io/ravenfield" 2>/dev/null | grep -q "download"; then
-    warn "Ravenfield requires manual download from itch.io"
-    # Создаём инструкцию для скачивания
-    cat > ~/Desktop/Games/Download-Ravenfield.txt << 'RAVENFIELD_INFO'
+echo "Setting up Ravenfield Beta 5 (free version)..."
+
+# Устанавливаем itch-dl для загрузки с itch.io
+if ! command -v itch-dl >/dev/null 2>&1; then
+    echo "Installing itch-dl tool..."
+    pip3 install --user itch-dl 2>/dev/null || pip install --user itch-dl 2>/dev/null || \
+        warn "Failed to install itch-dl"
+fi
+
+# Добавляем pip бинарники в PATH
+export PATH="$HOME/.local/bin:$PATH"
+
+# Пробуем скачать через itch-dl
+if command -v itch-dl >/dev/null 2>&1; then
+    cd ~/Desktop/Games
+    echo "Downloading Ravenfield Beta 5 from itch.io..."
+    # itch-dl автоматически скачает все доступные файлы
+    if itch-dl https://steelraven7.itch.io/ravenfield --download-to . 2>/dev/null; then
+        # Ищем скачанный архив
+        RAVENFIELD_ARCHIVE=$(ls -1t ravenfield*.zip 2>/dev/null | head -1)
+        if [ -n "$RAVENFIELD_ARCHIVE" ]; then
+            echo "Extracting $RAVENFIELD_ARCHIVE..."
+            unzip -q "$RAVENFIELD_ARCHIVE" || warn "Failed to extract"
+            rm -f "$RAVENFIELD_ARCHIVE"
+            info "Ravenfield Beta 5 downloaded and extracted"
+        fi
+    else
+        warn "itch-dl download failed, trying alternative method..."
+    fi
+fi
+
+# Альтернативный метод - прямая ссылка на Beta 5
+if [ ! -f ~/Desktop/Games/ravenfield* ] && [ ! -f ~/Desktop/Games/Ravenfield* ]; then
+    echo "Trying alternative download source..."
+    # Некоторые зеркала предоставляют прямые ссылки на Beta 5
+    BETA5_URL="https://archive.org/download/ravenfield-beta-5/Ravenfield%20Beta%205%20Linux.zip"
+    if curl -fsSL -o ~/Desktop/Games/ravenfield-beta5-linux.zip "$BETA5_URL" 2>/dev/null; then
+        cd ~/Desktop/Games
+        unzip -q ravenfield-beta5-linux.zip 2>/dev/null || warn "Failed to extract"
+        rm -f ravenfield-beta5-linux.zip
+        info "Ravenfield Beta 5 downloaded from archive"
+    else
+        # Создаём инструкцию как запасной вариант
+        cat > ~/Desktop/Games/Download-Ravenfield.txt << 'RAVENFIELD_INFO'
 RAVENFIELD DOWNLOAD INSTRUCTIONS
 ================================
 
-Ravenfield is available on itch.io and requires manual download.
+Automatic download failed. Please download manually:
 
-To download Ravenfield:
-1. Open your web browser
-2. Go to: https://steelraven7.itch.io/ravenfield
-3. Click "Download Now" 
-4. Name your own price (can be $0 for free)
-5. Download the Linux version
-6. Extract the zip file to this Games folder
-7. Run with: ./launch-ravenfield.sh
+1. Visit: https://steelraven7.itch.io/ravenfield
+2. Click "Download Now" 
+3. Name your own price ($0 for free)
+4. Download the Linux version
+5. Extract to this Games folder
+6. Run with: ./launch-ravenfield.sh
 
-The game will run through Proton for best compatibility.
+Alternative: Search for "Ravenfield Beta 5 Linux" online
 RAVENFIELD_INFO
-    info "Created Ravenfield download instructions"
-else
-    # Если удалось скачать, распаковываем
-    cd ~/Desktop/Games
-    unzip -q ravenfield-beta.zip 2>/dev/null || warn "Failed to extract Ravenfield"
-    rm -f ravenfield-beta.zip
-    info "Ravenfield downloaded"
+        warn "Automatic download failed - manual download required"
+    fi
 fi
 
 # Создаём launcher для Ravenfield
