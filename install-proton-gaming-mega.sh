@@ -325,6 +325,14 @@ WINDOWS_COMPONENTS_INSTALL() {
             proton-run winetricks -q --force \
                 dotnet35sp1 dotnet40 dotnet452 dotnet462 dotnet472 dotnet48 2>/dev/null || true
             
+            # Современные версии .NET
+            proton-run winetricks -q --force \
+                dotnetcore3 dotnet6 dotnet7 2>/dev/null || true
+            
+            # XNA Framework для инди-игр
+            proton-run winetricks -q --force \
+                xna31 xna40 2>/dev/null || true
+            
             echo "Installing DirectX components..."
             # DirectX компоненты (включая DX12)
             proton-run winetricks -q --force \
@@ -333,7 +341,8 @@ WINDOWS_COMPONENTS_INSTALL() {
                 directplay directmusic directshow \
                 dxdiag physx xact xinput \
                 dxvk vkd3d \
-                d3d12 2>/dev/null || true
+                d3d12 dinput dinput8 \
+                dsound dmime dmloader dmscript dmstyle dmsynth dmusic 2>/dev/null || true
             
             echo "Installing common Windows libraries..."
             # Другие важные библиотеки
@@ -354,9 +363,20 @@ WINDOWS_COMPONENTS_INSTALL() {
                 msls31 msftedit riched20 riched30 \
                 mdac28 jet40 \
                 windowscodecs \
-                dsound dmime dmloader dmscript dmstyle dmsynth dmusic \
                 devenum qcap qedit \
-                dsdmo l3codecx 2>/dev/null || true
+                dsdmo l3codecx \
+                mf \
+                h264 \
+                opencodecs 2>/dev/null || true
+            
+            echo "Installing game-specific components..."
+            # Компоненты для специфичных игр
+            proton-run winetricks -q --force \
+                binkw32 \
+                d9vk \
+                galliumnine \
+                dxvk_nvapi_disable \
+                win7 2>/dev/null || true
             
             echo "Setting Windows 10 compatibility mode..."
             # Установка режима совместимости
@@ -846,9 +866,9 @@ echo "  • Ravenfield game"
 echo ""
 echo -e "${GREEN}${CHECK} Windows components:${NC}"
 echo "  • Visual C++ 2005-2022"
-echo "  • .NET Framework 3.5-4.8"
-echo "  • DirectX 9-12 + PhysX"
-echo "  • Media codecs & fonts"
+echo "  • .NET Framework 3.5-4.8 + Core/6/7"
+echo "  • DirectX 9-12 + PhysX + XNA"
+echo "  • Media codecs, fonts & game libraries"
 echo ""
 echo -e "${FIRE} ${BOLD}Performance features:${NC}"
 echo "  • GameMode auto-activation"
