@@ -565,6 +565,102 @@ else
     warn "Failed to download DirectX Args Debugger"
 fi
 
+# Ravenfield Game
+substep "Downloading Ravenfield game..."
+mkdir -p ~/Desktop/Games
+echo "Downloading Ravenfield from itch.io..."
+echo "Note: This will download the free beta version"
+# Прямая ссылка на бесплатную бета-версию Ravenfield
+RAVENFIELD_URL="https://steelraven7.itch.io/ravenfield/download/eyJleHBpcmVzIjoxNzA0MDk2MDAwLCJpZCI6MjU5NzB9.0oAQvM5%2fpOdPrMKKH%2fgNqVJRkf0%3d"
+if curl -fsSL -L -o ~/Desktop/Games/ravenfield-beta.zip \
+    "https://steelraven7.itch.io/ravenfield" 2>/dev/null | grep -q "download"; then
+    warn "Ravenfield requires manual download from itch.io"
+    # Создаём инструкцию для скачивания
+    cat > ~/Desktop/Games/Download-Ravenfield.txt << 'RAVENFIELD_INFO'
+RAVENFIELD DOWNLOAD INSTRUCTIONS
+================================
+
+Ravenfield is available on itch.io and requires manual download.
+
+To download Ravenfield:
+1. Open your web browser
+2. Go to: https://steelraven7.itch.io/ravenfield
+3. Click "Download Now" 
+4. Name your own price (can be $0 for free)
+5. Download the Linux version
+6. Extract the zip file to this Games folder
+7. Run with: ./launch-ravenfield.sh
+
+The game will run through Proton for best compatibility.
+RAVENFIELD_INFO
+    info "Created Ravenfield download instructions"
+else
+    # Если удалось скачать, распаковываем
+    cd ~/Desktop/Games
+    unzip -q ravenfield-beta.zip 2>/dev/null || warn "Failed to extract Ravenfield"
+    rm -f ravenfield-beta.zip
+    info "Ravenfield downloaded"
+fi
+
+# Создаём launcher для Ravenfield
+cat > ~/Desktop/Games/launch-ravenfield.sh << 'RAVENFIELD_LAUNCHER'
+#!/usr/bin/env bash
+# Ravenfield launcher with Proton
+
+GAME_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Ищем исполняемый файл Ravenfield
+RAVENFIELD_EXE=""
+for exe in "$GAME_DIR"/ravenfield*.x86_64 "$GAME_DIR"/ravenfield*.x86 "$GAME_DIR"/Ravenfield.x86_64; do
+    if [ -f "$exe" ]; then
+        RAVENFIELD_EXE="$exe"
+        break
+    fi
+done
+
+if [ -z "$RAVENFIELD_EXE" ]; then
+    echo "ERROR: Ravenfield executable not found!"
+    echo "Please download and extract Ravenfield to this directory first."
+    echo "Visit: https://steelraven7.itch.io/ravenfield"
+    exit 1
+fi
+
+echo "🎮 Starting Ravenfield..."
+
+# Запускаем нативно, если это Linux-версия
+if file "$RAVENFIELD_EXE" | grep -q "ELF"; then
+    chmod +x "$RAVENFIELD_EXE"
+    exec "$RAVENFIELD_EXE"
+else
+    # Иначе через Proton
+    [ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
+    export PROTON_USE_WINED3D=0
+    export PROTON_NO_ESYNC=0
+    export PROTON_NO_FSYNC=0
+    exec proton-run "$RAVENFIELD_EXE"
+fi
+RAVENFIELD_LAUNCHER
+
+chmod +x ~/Desktop/Games/launch-ravenfield.sh
+
+# Desktop shortcut для Ravenfield
+cat > ~/Desktop/ravenfield.desktop << RAVENFIELDDESKTOP
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Ravenfield
+Comment=Single-player battlefield style game
+Exec=$HOME/Desktop/Games/launch-ravenfield.sh
+Icon=applications-games
+Terminal=false
+Categories=Game;ActionGame;
+StartupNotify=true
+RAVENFIELDDESKTOP
+
+chmod +x ~/Desktop/ravenfield.desktop
+gio set ~/Desktop/ravenfield.desktop "metadata::trusted" true 2>/dev/null || true
+info "Ravenfield launcher created"
+
 # Оптимизированный launcher
 substep "Creating optimized launcher..."
 cat > ~/Desktop/launch-directx-optimized.sh << 'LAUNCHER'
@@ -717,6 +813,7 @@ echo -e "${GREEN}${CHECK} User components:${NC}"
 echo "  • Proton-GE (latest)"
 echo "  • Optimized launcher"
 echo "  • DirectX Args Debugger"
+echo "  • Ravenfield game"
 echo ""
 echo -e "${GREEN}${CHECK} Windows components:${NC}"
 echo "  • Visual C++ 2005-2022"
@@ -753,5 +850,7 @@ echo "Checking installation:"
 [ -f "$TARGET_HOME/Desktop/launch-directx-optimized.sh" ] && echo "✓ Optimized launcher found" || echo "✗ Launcher missing"
 [ -f "$TARGET_HOME/.local/bin/proton-run" ] && echo "✓ proton-run found" || echo "✗ proton-run missing"
 [ -d "$TARGET_HOME/.steam/steam/compatibilitytools.d" ] && echo "✓ Proton directory exists" || echo "✗ Proton directory missing"
+[ -f "$TARGET_HOME/Desktop/ravenfield.desktop" ] && echo "✓ Ravenfield shortcut created" || echo "✗ Ravenfield shortcut missing"
+[ -d "$TARGET_HOME/Desktop/Games" ] && echo "✓ Games folder created" || echo "✗ Games folder missing"
 
 exit 0
