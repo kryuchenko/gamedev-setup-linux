@@ -4,7 +4,7 @@
 # ВСЁ В ОДНОМ: Proton-GE + Wine + Vulkan + DXVK + GameMode + Оптимизации
 # -----------------------------------------------------------------------------
 # Быстрая установка:
-#   curl -fsSL <GIST_URL> | sudo TARGET_USER=user bash
+#   curl -fsSL https://raw.githubusercontent.com/kryuchenko/gamedev-setup-linux/refs/heads/main/install-proton-gaming-mega.sh | sudo TARGET_USER=user bash
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
