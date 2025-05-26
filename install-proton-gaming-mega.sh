@@ -145,16 +145,35 @@ safe_exec apt-get install -y --no-install-recommends \
     libspa-0.2-bluetooth
 info "Audio stack installed"
 
-# Wine + Vulkan
-substep "Installing Wine + Vulkan stack..."
+# WineHQ latest + Vulkan
+substep "Adding WineHQ repository..."
 safe_exec dpkg --add-architecture i386
+safe_exec mkdir -p /etc/apt/keyrings
+safe_exec curl -fsSL https://dl.winehq.org/wine-builds/winehq.key \
+    | gpg --dearmor -o /etc/apt/keyrings/winehq.gpg
+safe_exec tee /etc/apt/sources.list.d/winehq.list << EOF >/dev/null
+deb [signed-by=/etc/apt/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ $DIST_CODENAME main
+EOF
 safe_exec apt-get update -qq
-safe_exec apt-get install -y --no-install-recommends \
-    wine wine64 wine32 libwine libwine:i386 fonts-wine \
-    libvulkan1 libvulkan1:i386 mesa-vulkan-drivers mesa-vulkan-drivers:i386 \
+
+substep "Installing latest WineHQ + Vulkan stack..."
+# Пробуем установить в порядке приоритета: staging -> devel -> stable
+if ! safe_exec apt-get install -y --install-recommends winehq-staging; then
+    warn "winehq-staging not available, trying devel..."
+    if ! safe_exec apt-get install -y --install-recommends winehq-devel; then
+        warn "winehq-devel not available, installing stable..."
+        safe_exec apt-get install -y --install-recommends winehq-stable
+    fi
+fi
+
+# Дополнительные компоненты
+safe_exec apt-get install -y --install-recommends \
+    wine32 wine64 \
+    libvulkan1 libvulkan1:i386 \
+    mesa-vulkan-drivers mesa-vulkan-drivers:i386 \
     vulkan-tools zenity cabextract \
     fluid-soundfont-gs libwebrtc-audio-processing1
-info "Wine & Vulkan installed"
+info "WineHQ (latest available) & Vulkan installed"
 
 # GameMode и оптимизации
 substep "Installing GameMode and performance tools..."
@@ -202,7 +221,7 @@ fi
 # Lutris & Steam
 substep "Installing Lutris & Steam..."
 safe_exec apt-get update -qq
-safe_exec apt-get install -y --no-install-recommends lutris steam-installer || \
+safe_exec apt-get install -y --no-install-recommends lutris steam || \
     warn "Lutris/Steam installation incomplete"
 info "Gaming platforms configured"
 
