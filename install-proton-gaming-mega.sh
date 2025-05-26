@@ -302,12 +302,14 @@ WINDOWS_COMPONENTS_INSTALL() {
                 dotnet35sp1 dotnet40 dotnet452 dotnet462 dotnet472 dotnet48 2>/dev/null || true
             
             echo "Installing DirectX components..."
-            # DirectX компоненты
+            # DirectX компоненты (включая DX12)
             proton-run winetricks -q --force \
                 d3dx9 d3dx10 d3dx11_42 d3dx11_43 \
-                d3dcompiler_42 d3dcompiler_43 d3dcompiler_47 \
+                d3dcompiler_42 d3dcompiler_43 d3dcompiler_46 d3dcompiler_47 \
                 directplay directmusic directshow \
-                dxdiag physx xact xinput 2>/dev/null || true
+                dxdiag physx xact xinput \
+                dxvk vkd3d \
+                d3d12 2>/dev/null || true
             
             echo "Installing common Windows libraries..."
             # Другие важные библиотеки
@@ -696,7 +698,7 @@ echo ""
 echo -e "${GREEN}${CHECK} Windows components:${NC}"
 echo "  • Visual C++ 2005-2022"
 echo "  • .NET Framework 3.5-4.8"
-echo "  • DirectX 9-11 + PhysX"
+echo "  • DirectX 9-12 + PhysX"
 echo "  • Media codecs & fonts"
 echo ""
 echo -e "${FIRE} ${BOLD}Performance features:${NC}"
