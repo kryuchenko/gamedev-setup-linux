@@ -142,8 +142,17 @@ substep "Installing low-latency audio stack..."
 safe_exec apt-get install -y --no-install-recommends \
     pulseaudio pulseaudio-utils soxr libsoxr0 \
     pipewire pipewire-audio-client-libraries wireplumber \
-    libspa-0.2-bluetooth
+    libspa-0.2-bluetooth libasound2-plugins:i386 \
+    libpulse0:i386 libsdl2-2.0-0:i386
 info "Audio stack installed"
+
+# Дополнительные библиотеки для игр
+substep "Installing additional gaming libraries..."
+safe_exec apt-get install -y --no-install-recommends \
+    libgnutls30:i386 libldap-2.5-0:i386 libgpg-error0:i386 \
+    libxml2:i386 libasound2-plugins:i386 libsdl2-2.0-0:i386 \
+    libfreetype6:i386 libdbus-1-3:i386 libsqlite3-0:i386
+info "Additional gaming libraries installed"
 
 # WineHQ latest + Vulkan
 substep "Adding WineHQ repository..."
@@ -220,10 +229,22 @@ fi
 echo "deb [$KEYOPT] https://download.opensuse.org/repositories/home:/strycore/Debian_12/ /" \
     > /etc/apt/sources.list.d/lutris.list
 
+# Lutris dependencies
+substep "Installing Lutris dependencies..."
+safe_exec apt-get install -y --no-install-recommends \
+    python3 python3-gi python3-gi-cairo python3-pil python3-requests \
+    python3-yaml python3-setproctitle python3-distro python3-lxml \
+    gir1.2-gtk-3.0 gir1.2-glib-2.0 gir1.2-gdkpixbuf-2.0 \
+    gir1.2-webkit2-4.0 gir1.2-notify-0.7 \
+    libgirepository-1.0-1 libcanberra-gtk3-module \
+    psmisc cabextract unzip p7zip-full curl wget \
+    fluid-soundfont-gs x11-xserver-utils mesa-utils \
+    gvfs gvfs-backends
+
 # Lutris & Steam
 substep "Installing Lutris & Steam..."
 safe_exec apt-get update -qq
-safe_exec apt-get install -y --no-install-recommends lutris steam || \
+safe_exec apt-get install -y lutris steam || \
     warn "Lutris/Steam installation incomplete"
 info "Gaming platforms configured"
 
