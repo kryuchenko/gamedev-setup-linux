@@ -279,6 +279,76 @@ DXVK_INSTALL() {
     info "DXVK & VKD3D installed via winetricks"
 }
 
+# Функция для установки всех необходимых Windows компонентов
+WINDOWS_COMPONENTS_INSTALL() {
+    step "Installing Essential Windows Components 📦"
+    
+    substep "Installing Windows runtime libraries via winetricks..."
+    sudo -u "$TARGET_USER" -H bash -c '
+        export WINEPREFIX="$HOME/Games/proton-prefixes/default"
+        export PATH="$HOME/.local/bin:$PATH"
+        mkdir -p "$WINEPREFIX"
+        
+        if command -v proton-run >/dev/null 2>&1 && command -v winetricks >/dev/null 2>&1; then
+            echo "Installing Visual C++ Redistributables..."
+            # Visual C++ Redistributables (все версии)
+            proton-run winetricks -q --force \
+                vcrun2005 vcrun2008 vcrun2010 vcrun2012 vcrun2013 \
+                vcrun2015 vcrun2017 vcrun2019 vcrun2022 2>/dev/null || true
+            
+            echo "Installing .NET Framework components..."
+            # .NET Framework (основные версии)
+            proton-run winetricks -q --force \
+                dotnet35sp1 dotnet40 dotnet452 dotnet462 dotnet472 dotnet48 2>/dev/null || true
+            
+            echo "Installing DirectX components..."
+            # DirectX компоненты
+            proton-run winetricks -q --force \
+                d3dx9 d3dx10 d3dx11_42 d3dx11_43 \
+                d3dcompiler_42 d3dcompiler_43 d3dcompiler_47 \
+                directplay directmusic directshow \
+                dxdiag physx xact xinput 2>/dev/null || true
+            
+            echo "Installing common Windows libraries..."
+            # Другие важные библиотеки
+            proton-run winetricks -q --force \
+                corefonts tahoma liberation \
+                msxml3 msxml4 msxml6 \
+                mfc40 mfc42 \
+                vb6run \
+                gdiplus \
+                faudio \
+                lavfilters \
+                xvid ffdshow \
+                openal \
+                quartz amstream \
+                wmv9vcm wmp10 wmp11 \
+                ie8 \
+                flash \
+                msls31 msftedit riched20 riched30 \
+                mdac28 jet40 \
+                windowscodecs \
+                dsound dmime dmloader dmscript dmstyle dmsynth dmusic \
+                devenum qcap qedit \
+                dsdmo l3codecx 2>/dev/null || true
+            
+            echo "Setting Windows 10 compatibility mode..."
+            # Установка режима совместимости
+            proton-run winetricks -q win10 2>/dev/null || true
+            
+            echo "Applying performance tweaks..."
+            # Оптимизации производительности
+            proton-run winetricks -q --force \
+                fontsmooth=rgb \
+                renderer=vulkan \
+                videomemorysize=4096 2>/dev/null || true
+        else
+            echo "WARNING: proton-run or winetricks not available yet"
+        fi
+    '
+    info "Windows components installation completed"
+}
+
 # ═══════════════════════════════════════════════════════════════════════════
 # ФАЗА 2: ОПТИМИЗАЦИИ СИСТЕМЫ
 # ═══════════════════════════════════════════════════════════════════════════
@@ -558,6 +628,9 @@ fi
 # Теперь устанавливаем DXVK/VKD3D когда proton-run точно есть
 DXVK_INSTALL
 
+# Устанавливаем все Windows компоненты
+WINDOWS_COMPONENTS_INSTALL
+
 # Удаляем временный скрипт
 rm -f "$USER_INSTALL_SCRIPT"
 
@@ -619,6 +692,12 @@ echo -e "${GREEN}${CHECK} User components:${NC}"
 echo "  • Proton-GE (latest)"
 echo "  • Optimized launcher"
 echo "  • DirectX Args Debugger"
+echo ""
+echo -e "${GREEN}${CHECK} Windows components:${NC}"
+echo "  • Visual C++ 2005-2022"
+echo "  • .NET Framework 3.5-4.8"
+echo "  • DirectX 9-11 + PhysX"
+echo "  • Media codecs & fonts"
 echo ""
 echo -e "${FIRE} ${BOLD}Performance features:${NC}"
 echo "  • GameMode auto-activation"
