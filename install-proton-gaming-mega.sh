@@ -210,7 +210,21 @@ safe_exec curl -fsSL -o /usr/local/bin/winetricks \
 safe_exec chmod +x /usr/local/bin/winetricks
 info "winetricks installed"
 
-# Lutris репозиторий
+# Ensure Wine is accessible system-wide
+substep "Configuring Wine PATH..."
+# Create symlinks for Wine binaries if needed
+if [ -f /opt/wine-stable/bin/wine ]; then
+    ln -sf /opt/wine-stable/bin/wine /usr/local/bin/wine
+    ln -sf /opt/wine-stable/bin/wine64 /usr/local/bin/wine64
+    ln -sf /opt/wine-stable/bin/winecfg /usr/local/bin/winecfg
+    ln -sf /opt/wine-stable/bin/wineserver /usr/local/bin/wineserver
+fi
+# Add Wine to system PATH
+echo 'export PATH="$PATH:/opt/wine-stable/bin:/opt/wine-devel/bin:/opt/wine-staging/bin"' > /etc/profile.d/wine-path.sh
+chmod +x /etc/profile.d/wine-path.sh
+info "Wine PATH configured"
+
+# Lutris repository
 substep "Configuring Lutris repository..."
 safe_exec mkdir -p /etc/apt/keyrings
 
@@ -576,6 +590,66 @@ DESKTOP
 update-desktop-database ~/.local/share/applications 2>/dev/null || true
 xdg-mime default proton-run.desktop application/x-ms-dos-executable application/x-exe application/x-winexe 2>/dev/null || true
 
+# Wine desktop integration
+substep "Setting up Wine desktop integration..."
+
+# Create Wine launcher for right-click menu
+cat > ~/.local/share/applications/wine-run.desktop << 'WINEDESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Run with Wine
+Comment=Run Windows executable with Wine
+Exec=wine %f
+Icon=wine
+Categories=System;
+MimeType=application/x-ms-dos-executable;application/x-exe;application/x-winexe;application/x-msi;
+NoDisplay=false
+Terminal=false
+WINEDESKTOP
+
+# Create Wine configuration launcher
+cat > ~/.local/share/applications/winecfg.desktop << 'WINECFGDESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Wine Configuration
+Comment=Configure Wine
+Exec=winecfg
+Icon=wine-winecfg
+Categories=System;Settings;
+Terminal=false
+WINECFGDESKTOP
+
+# Create Wine uninstaller launcher
+cat > ~/.local/share/applications/wine-uninstaller.desktop << 'WINEUNINSTDESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Wine Software Uninstaller
+Comment=Uninstall Windows applications
+Exec=wine uninstaller
+Icon=wine-uninstaller
+Categories=System;
+Terminal=false
+WINEUNINSTDESKTOP
+
+# Update MIME database
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+
+# Add Wine to right-click context menu
+mkdir -p ~/.local/share/file-manager/actions
+cat > ~/.local/share/file-manager/actions/wine-run.desktop << 'WINEACTION'
+[Desktop Entry]
+Type=Action
+Name=Run with Wine
+Icon=wine
+Profiles=profile-wine;
+
+[X-Action-Profile profile-wine]
+Exec=wine %f
+MimeTypes=application/x-ms-dos-executable;application/x-exe;application/x-winexe;application/x-msi;
+WINEACTION
+
+info "Wine desktop integration configured"
+
 # DirectX Args Debugger
 substep "Downloading DirectX Args Debugger..."
 if curl -fsSL -o ~/Desktop/directx-args-debugger.exe \
@@ -591,23 +665,23 @@ substep "Downloading Ravenfield game..."
 mkdir -p ~/Desktop/Games
 echo "Setting up Ravenfield Beta 5 (free version)..."
 
-# Устанавливаем itch-dl для загрузки с itch.io
+# Install itch-dl for downloading from itch.io
 if ! command -v itch-dl >/dev/null 2>&1; then
     echo "Installing itch-dl tool..."
     pip3 install --user itch-dl 2>/dev/null || pip install --user itch-dl 2>/dev/null || \
         warn "Failed to install itch-dl"
 fi
 
-# Добавляем pip бинарники в PATH
+# Add pip binaries to PATH
 export PATH="$HOME/.local/bin:$PATH"
 
-# Пробуем скачать через itch-dl
+# Try to download via itch-dl
 if command -v itch-dl >/dev/null 2>&1; then
     cd ~/Desktop/Games
     echo "Downloading Ravenfield Beta 5 from itch.io..."
-    # itch-dl автоматически скачает все доступные файлы
+    # itch-dl will automatically download all available files
     if itch-dl https://steelraven7.itch.io/ravenfield --download-to . 2>/dev/null; then
-        # Ищем скачанный архив
+        # Look for downloaded archive
         RAVENFIELD_ARCHIVE=$(ls -1t ravenfield*.zip 2>/dev/null | head -1)
         if [ -n "$RAVENFIELD_ARCHIVE" ]; then
             echo "Extracting $RAVENFIELD_ARCHIVE..."
@@ -620,10 +694,10 @@ if command -v itch-dl >/dev/null 2>&1; then
     fi
 fi
 
-# Альтернативный метод - прямая ссылка на Beta 5
+# Alternative method - direct link to Beta 5
 if [ ! -f ~/Desktop/Games/ravenfield* ] && [ ! -f ~/Desktop/Games/Ravenfield* ]; then
     echo "Trying alternative download source..."
-    # Некоторые зеркала предоставляют прямые ссылки на Beta 5
+    # Some mirrors provide direct links to Beta 5
     BETA5_URL="https://archive.org/download/ravenfield-beta-5/Ravenfield%20Beta%205%20Linux.zip"
     if curl -fsSL -o ~/Desktop/Games/ravenfield-beta5-linux.zip "$BETA5_URL" 2>/dev/null; then
         cd ~/Desktop/Games
@@ -631,7 +705,7 @@ if [ ! -f ~/Desktop/Games/ravenfield* ] && [ ! -f ~/Desktop/Games/Ravenfield* ];
         rm -f ravenfield-beta5-linux.zip
         info "Ravenfield Beta 5 downloaded from archive"
     else
-        # Создаём инструкцию как запасной вариант
+        # Create instructions as fallback
         cat > ~/Desktop/Games/Download-Ravenfield.txt << 'RAVENFIELD_INFO'
 RAVENFIELD DOWNLOAD INSTRUCTIONS
 ================================
@@ -651,14 +725,14 @@ RAVENFIELD_INFO
     fi
 fi
 
-# Создаём launcher для Ravenfield
+# Create launcher for Ravenfield
 cat > ~/Desktop/Games/launch-ravenfield.sh << 'RAVENFIELD_LAUNCHER'
 #!/usr/bin/env bash
 # Ravenfield launcher with Proton
 
 GAME_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Ищем исполняемый файл Ravenfield
+# Look for Ravenfield executable
 RAVENFIELD_EXE=""
 for exe in "$GAME_DIR"/ravenfield*.x86_64 "$GAME_DIR"/ravenfield*.x86 "$GAME_DIR"/Ravenfield.x86_64; do
     if [ -f "$exe" ]; then
@@ -676,12 +750,12 @@ fi
 
 echo "🎮 Starting Ravenfield..."
 
-# Запускаем нативно, если это Linux-версия
+# Run natively if it's Linux version
 if file "$RAVENFIELD_EXE" | grep -q "ELF"; then
     chmod +x "$RAVENFIELD_EXE"
     exec "$RAVENFIELD_EXE"
 else
-    # Иначе через Proton
+    # Otherwise via Proton
     [ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
     export PROTON_USE_WINED3D=0
     export PROTON_NO_ESYNC=0
@@ -692,7 +766,7 @@ RAVENFIELD_LAUNCHER
 
 chmod +x ~/Desktop/Games/launch-ravenfield.sh
 
-# Desktop shortcut для Ravenfield
+# Desktop shortcut for Ravenfield
 cat > ~/Desktop/ravenfield.desktop << RAVENFIELDDESKTOP
 [Desktop Entry]
 Version=1.0
@@ -710,7 +784,7 @@ chmod +x ~/Desktop/ravenfield.desktop
 gio set ~/Desktop/ravenfield.desktop "metadata::trusted" true 2>/dev/null || true
 info "Ravenfield launcher created"
 
-# Оптимизированный launcher
+# Optimized launcher
 substep "Creating optimized launcher..."
 cat > ~/Desktop/launch-directx-optimized.sh << 'LAUNCHER'
 #!/usr/bin/env bash
@@ -738,12 +812,12 @@ export mesa_glthread=true
 export vblank_mode=0
 
 # AUDIO OPTIMIZATIONS
-export PULSE_LATENCY_MSEC=32          # < 48 ms — уходит щелчок каждые 5 с
-export SDL_AUDIODRIVER=pulse          # форсируем Pulse вместо ALSA
-export WINE_RT=1                      # rt-треды для Wine
+export PULSE_LATENCY_MSEC=32          # < 48 ms — removes click every 5s
+export SDL_AUDIODRIVER=pulse          # force Pulse instead of ALSA
+export WINE_RT=1                      # rt-threads for Wine
 export WINE_RT_PRIORITY_BASE=80
 
-# DXVK HUD настройки
+# DXVK HUD settings
 export DXVK_HUD=fps,gpuload
 
 echo "🚀 Launching with GameMode + Maximum Performance..."
@@ -753,7 +827,7 @@ echo "⚡ VSync: DISABLED"
 
 cd "$SCRIPT_DIR"
 
-# Запускаем через GameMode с LD_PRELOAD
+# Launch via GameMode with LD_PRELOAD
 LD_PRELOAD="libgamemodeauto.so.0${LD_PRELOAD:+:$LD_PRELOAD}" \
 exec proton-run "$EXE_FILE" "$@"
 LAUNCHER
@@ -779,51 +853,51 @@ chmod +x ~/Desktop/directx-optimized.desktop
 gio set ~/Desktop/directx-optimized.desktop "metadata::trusted" true 2>/dev/null || true
 info "Desktop shortcut created"
 
-# Показываем что установлено
+# Show what was installed
 echo ""
 info "User installation complete!"
 echo "Files on desktop:"
 ls -la ~/Desktop/directx-* ~/Desktop/launch-* 2>/dev/null || true
 USERSCRIPT
 
-# Делаем скрипт исполняемым
+# Make script executable
 chmod +x "$USER_INSTALL_SCRIPT" || { error "Failed to chmod user script"; exit 1; }
 
-# Запускаем от имени пользователя
+# Run as target user
 info "Running user installation for: $TARGET_USER"
 if ! sudo -u "$TARGET_USER" -H bash "$USER_INSTALL_SCRIPT"; then
     warn "User installation had some issues, but continuing..."
 fi
 
-# Теперь устанавливаем DXVK/VKD3D когда proton-run точно есть
+# Now install DXVK/VKD3D when proton-run is definitely available
 DXVK_INSTALL
 
-# Устанавливаем все Windows компоненты
+# Install all Windows components
 WINDOWS_COMPONENTS_INSTALL
 
-# Удаляем временный скрипт
+# Remove temporary script
 rm -f "$USER_INSTALL_SCRIPT"
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ФАЗА 4: ФИНАЛЬНАЯ НАСТРОЙКА
+# PHASE 4: FINAL CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════
 
 step "PHASE 4: Final Configuration ${ROCKET}"
 
-# Определение GPU
+# GPU detection
 substep "Detecting GPU..."
 GPU_TYPE="unknown"
 if lspci 2>/dev/null | grep -i nvidia >/dev/null 2>&1; then
     GPU_TYPE="nvidia"
     info "NVIDIA GPU detected"
-    # Максимальная производительность NVIDIA
+    # Maximum performance for NVIDIA
     if command -v nvidia-settings &>/dev/null; then
         safe_exec sudo -u "$TARGET_USER" nvidia-settings -a "[gpu:0]/GpuPowerMizerMode=1"
     fi
 elif lspci 2>/dev/null | grep -E "AMD|ATI" >/dev/null 2>&1; then
     GPU_TYPE="amd"
     info "AMD GPU detected"
-    # Производительный режим AMD
+    # Performance mode for AMD
     for card in /sys/class/drm/card*/device/power_dpm_force_performance_level; do
         [ -f "$card" ] && echo "high" > "$card" 2>/dev/null || true
     done
@@ -832,7 +906,7 @@ else
     info "Intel/Other GPU detected"
 fi
 
-# Тест GameMode
+# Test GameMode
 substep "Verifying GameMode..."
 if gamemoded -t >/dev/null 2>&1; then
     info "GameMode test passed"
@@ -841,7 +915,7 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ЗАВЕРШЕНИЕ
+# COMPLETION
 # ═══════════════════════════════════════════════════════════════════════════
 
 echo ""
@@ -892,7 +966,7 @@ echo -e "${YELLOW}${BOLD}Note:${NC} For SSH access, set: export DISPLAY=:0"
 echo ""
 echo -e "${PURPLE}${BOLD}Enjoy maximum FPS gaming! ${GAME}${FIRE}${ROCKET}${NC}"
 
-# Финальная проверка
+# Final check
 echo ""
 echo "Checking installation:"
 [ -f "$TARGET_HOME/Desktop/directx-args-debugger.exe" ] && echo "✓ DirectX Debugger found" || echo "✗ DirectX Debugger missing"
