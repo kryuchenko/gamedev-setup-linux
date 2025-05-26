@@ -680,7 +680,7 @@ fi
 
 echo ""
 echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}${BOLD}║                    🎉 INSTALLATION COMPLETE! 🎉                  ║${NC}"
+echo -e "${GREEN}${BOLD}║                    🎉 INSTALLATION COMPLETE! 🎉                    ║${NC}"
 echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${BOLD}Installed for user:${NC} $TARGET_USER"
