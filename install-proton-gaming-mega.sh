@@ -155,6 +155,23 @@ safe_exec apt-get install -y --no-install-recommends \
     libfreetype6:i386 libdbus-1-3:i386 libsqlite3-0:i386
 info "Additional gaming libraries installed"
 
+# Unity-специфичные библиотеки
+substep "Installing Unity game dependencies..."
+safe_exec apt-get install -y --no-install-recommends \
+    libstdc++6 libstdc++6:i386 \
+    libgcc1 libgcc1:i386 \
+    libgl1-mesa-glx libgl1-mesa-glx:i386 \
+    libglu1-mesa libglu1-mesa:i386 \
+    libx11-6 libx11-6:i386 \
+    libxcursor1 libxcursor1:i386 \
+    libxrandr2 libxrandr2:i386 \
+    libxi6 libxi6:i386 \
+    libxinerama1 libxinerama1:i386 \
+    libxxf86vm1 libxxf86vm1:i386 \
+    mono-runtime libmono-system-core4.0-cil \
+    libmono-corlib4.5-cil
+info "Unity dependencies installed"
+
 # WineHQ latest + Vulkan
 substep "Adding WineHQ repository..."
 safe_exec dpkg --add-architecture i386
@@ -753,14 +770,35 @@ echo "🎮 Starting Ravenfield..."
 # Run natively if it's Linux version
 if file "$RAVENFIELD_EXE" | grep -q "ELF"; then
     chmod +x "$RAVENFIELD_EXE"
-    exec "$RAVENFIELD_EXE"
+    
+    # Unity-specific fixes
+    export LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:/usr/lib/i386-linux-gnu:$LD_LIBRARY_PATH"
+    export MESA_GL_VERSION_OVERRIDE=4.5
+    export MESA_GLSL_VERSION_OVERRIDE=450
+    
+    # Check and remove old libraries from game folder
+    for lib in libstdc++.so.6 libgcc_s.so.1; do
+        if [ -f "$GAME_DIR/$lib" ]; then
+            echo "Removing bundled $lib to avoid conflicts..."
+            mv "$GAME_DIR/$lib" "$GAME_DIR/$lib.bak" 2>/dev/null
+        fi
+    done
+    
+    # Run with Unity parameters
+    exec "$RAVENFIELD_EXE" -force-opengl -screen-fullscreen 0 -popupwindow
 else
-    # Otherwise via Proton
+    # Windows version via Proton
     [ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
     export PROTON_USE_WINED3D=0
     export PROTON_NO_ESYNC=0
     export PROTON_NO_FSYNC=0
-    exec proton-run "$RAVENFIELD_EXE"
+    export PROTON_FORCE_LARGE_ADDRESS_AWARE=1
+    
+    # Unity fixes for Wine
+    export WINEDLLOVERRIDES="d3d11=n,b"
+    export __GL_THREADED_OPTIMIZATIONS=1
+    
+    exec proton-run "$RAVENFIELD_EXE" -force-d3d11 -screen-fullscreen 0 -popupwindow
 fi
 RAVENFIELD_LAUNCHER
 
@@ -783,6 +821,68 @@ RAVENFIELDDESKTOP
 chmod +x ~/Desktop/ravenfield.desktop
 gio set ~/Desktop/ravenfield.desktop "metadata::trusted" true 2>/dev/null || true
 info "Ravenfield launcher created"
+
+# Create diagnostics script for Ravenfield
+cat > ~/Desktop/Games/diagnose-ravenfield.sh << 'DIAGNOSE'
+#!/usr/bin/env bash
+# Diagnose Ravenfield issues
+
+echo "=== Ravenfield Diagnostics ==="
+echo ""
+
+# Check executable
+GAME_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RAVENFIELD_EXE=""
+for exe in "$GAME_DIR"/ravenfield*.x86_64 "$GAME_DIR"/ravenfield*.x86 "$GAME_DIR"/Ravenfield.x86_64; do
+    if [ -f "$exe" ]; then
+        RAVENFIELD_EXE="$exe"
+        break
+    fi
+done
+
+if [ -z "$RAVENFIELD_EXE" ]; then
+    echo "ERROR: Ravenfield executable not found!"
+    exit 1
+fi
+
+echo "Found executable: $RAVENFIELD_EXE"
+echo ""
+
+# Check dependencies
+echo "Checking dependencies with ldd:"
+ldd "$RAVENFIELD_EXE" | grep "not found" && echo "WARNING: Missing libraries detected!"
+echo ""
+
+# Check OpenGL
+echo "OpenGL info:"
+glxinfo | grep -E "OpenGL version|OpenGL renderer" || echo "ERROR: OpenGL not available!"
+echo ""
+
+# Check 32-bit support
+echo "32-bit support:"
+dpkg --print-foreign-architectures | grep -q i386 && echo "✓ i386 architecture enabled" || echo "✗ i386 not enabled"
+echo ""
+
+# Try running with debug output
+echo "Attempting to run with debug output..."
+echo "Press Ctrl+C to stop"
+echo ""
+
+export LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:/usr/lib/i386-linux-gnu:$LD_LIBRARY_PATH"
+export MESA_GL_VERSION_OVERRIDE=4.5
+export MESA_GLSL_VERSION_OVERRIDE=450
+export LIBGL_DEBUG=verbose
+
+cd "$GAME_DIR"
+chmod +x "$RAVENFIELD_EXE"
+"$RAVENFIELD_EXE" -logfile ravenfield.log -force-opengl -screen-fullscreen 0 -popupwindow
+
+echo ""
+echo "Check ravenfield.log for Unity errors"
+DIAGNOSE
+
+chmod +x ~/Desktop/Games/diagnose-ravenfield.sh
+info "Ravenfield diagnostics script created"
 
 # Optimized launcher
 substep "Creating optimized launcher..."
